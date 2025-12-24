@@ -68,8 +68,8 @@ data/output/
 logs/
 
 # Phase 1 and Phase 2 example data (optional - uncomment to exclude)
-# phase1_data/
-# phase2_data/
+ phase1_data/
+ phase2_data/
 
 # Keep directory structure
 !data/input/.gitkeep
