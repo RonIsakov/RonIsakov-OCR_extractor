@@ -57,9 +57,19 @@ htmlcov/
 .claude/
 *.claude
 
-# Data directories (optional - uncomment if you don't want to track uploaded/output files)
-# data/input/*
-# data/output/*
+# Test scripts
+test_setup.py
+test_azure_connection.py
+test_phase2.py
+extract_and_save_text.py
+
+# Data directories - exclude outputs but keep structure
+data/output/
+logs/
+
+# Phase 1 and Phase 2 example data (optional - uncomment to exclude)
+# phase1_data/
+# phase2_data/
 
 # Keep directory structure
 !data/input/.gitkeep
