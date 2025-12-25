@@ -61,6 +61,8 @@ htmlcov/
 test_setup.py
 test_azure_connection.py
 test_phase2.py
+test_phase3.py
+test_phase4.py
 extract_and_save_text.py
 
 # Data directories - exclude outputs but keep structure
