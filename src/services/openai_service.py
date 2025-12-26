@@ -133,12 +133,12 @@ class OpenAIService:
         ocr_text: str
     ) -> Tuple[Form283Data, Dict[str, Any], ValidationReport]:
         """
-        Extract fields, validate, and compare raw vs validated output.
+        Extract fields and validate with quality checks.
 
         This method:
-        1. Extracts fields using extract_fields() (raw GPT-4o output)
+        1. Extracts fields using extract_fields() (GPT-4o extraction)
         2. Validates against Form283Data Pydantic model
-        3. Compares raw vs validated to track corrections (delta)
+        3. Runs quality checks on validated data
         4. Returns validated data + validation report
 
         Args:
@@ -155,12 +155,12 @@ class OpenAIService:
             ValueError: If JSON parsing fails
             Exception: If API call fails
         """
-        logger.info("Starting extraction with validation and delta tracking")
+        logger.info("Starting extraction with validation and quality checks")
 
-        # Step 1: Extract fields (raw GPT-4o output)
+        # Step 1: Extract fields (GPT-4o extraction)
         raw_extracted_data, metadata = self.extract_fields(ocr_text)
 
-        # Step 2: Validate against Pydantic schema (may auto-correct fields)
+        # Step 2: Validate against Pydantic schema
         try:
             form_data = Form283Data(**raw_extracted_data)
             logger.info(
@@ -178,15 +178,15 @@ class OpenAIService:
             )
             raise
 
-        # Step 3: Compare raw vs validated (delta tracking)
+        # Step 3: Run quality checks on validated data
         validation_service = ValidationService()
-        validation_report = validation_service.validate(raw_extracted_data, form_data)
+        validation_report = validation_service.validate(form_data)
 
         logger.info(
             "Validation report generated",
             accuracy=validation_report.accuracy_score,
             completeness=validation_report.completeness_score,
-            corrections=len(validation_report.corrections)
+            quality_issues=len(validation_report.corrections)
         )
 
         return form_data, metadata, validation_report

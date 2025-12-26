@@ -1,7 +1,15 @@
 """
-Validation service for comparing raw GPT-4o extraction vs Pydantic validated output.
+Validation service for quality checking and accuracy tracking.
 
-This module provides simple delta comparison to track accuracy and completeness.
+This module:
+- Validates Pydantic-validated form data for quality issues
+- Performs quality checks on validated data (format violations, wrong values)
+- Reports issues without blocking (permissive validation)
+- Calculates accuracy and completeness scores
+
+this service checks
+the Pydantic output for quality issues. It checks numeric formats, value ranges,
+and Israeli-specific rules (ID length, phone format, etc.) and reports violations.
 """
 
 from typing import Dict, Any, List
@@ -14,45 +22,40 @@ logger = get_logger(__name__)
 
 class ValidationService:
     """
-    Service for comparing raw extraction vs validated output.
+    Service for validating Pydantic-validated form data.
 
     Calculates:
-    - Accuracy: Percentage of fields GPT-4o extracted correctly (no corrections)
+    - Accuracy: Percentage of fields that pass quality checks
     - Completeness: Percentage of fields filled
-    - Corrections: List of fields that Pydantic auto-corrected
+    - Quality Issues: List of fields that don't meet format requirements
     """
 
     def validate(
         self,
-        raw_extracted: Dict[str, Any],
         validated_form: Form283Data
     ) -> ValidationReport:
         """
-        Compare raw GPT-4o output with Pydantic validated output.
+        Validate Pydantic-validated form data for quality issues.
 
         Args:
-            raw_extracted: Raw JSON from GPT-4o (before Pydantic validation)
             validated_form: Validated Form283Data instance
 
         Returns:
-            ValidationReport with accuracy, completeness, and corrections
+            ValidationReport with accuracy, completeness, and quality issues
         """
-        logger.info("Starting validation delta comparison")
+        logger.info("Starting quality validation")
 
-        # Get validated data as dict (using aliases for Hebrew field names)
+        # Get validated data as dict
         validated_dict = validated_form.model_dump(by_alias=True)
 
-        # Find corrections from Pydantic auto-corrections
-        corrections = self._find_corrections(raw_extracted, validated_dict)
-
-        # Add quality issues (fields that don't meet format rules)
+        # Check for quality issues (fields that don't meet format rules)
         quality_issues = self._check_field_quality(validated_dict)
-        corrections.extend(quality_issues)  # Combine both types
 
-        # Calculate accuracy
-        total_fields = self._count_non_empty_fields(validated_dict)
-        unchanged_fields = total_fields - len(corrections)
-        accuracy_score = (unchanged_fields / total_fields * 100) if total_fields > 0 else 100.0
+        # Calculate accuracy (fields without quality issues / total filled fields)
+        total_filled = self._count_non_empty_fields(validated_dict)
+        fields_with_issues = len(quality_issues)
+        fields_without_issues = total_filled - fields_with_issues
+        accuracy_score = (fields_without_issues / total_filled * 100) if total_filled > 0 else 100.0
 
         # Get completeness from existing methods
         filled_count, total_count = validated_form.get_filled_fields_count()
@@ -62,128 +65,28 @@ class ValidationService:
         missing_fields = self._get_missing_fields(validated_dict)
 
         # Generate summary
-        auto_corrections_count = len([c for c in corrections if c.auto_corrected])
-        quality_issues_count = len([c for c in corrections if not c.auto_corrected])
-
         summary = (
             f"Validation passed. {filled_count}/{total_count} fields filled ({completeness_score:.1f}%). "
-            f"{unchanged_fields}/{total_fields} data fields accurate ({accuracy_score:.1f}%). "
-            f"{auto_corrections_count} field(s) auto-corrected, {quality_issues_count} quality issue(s) detected."
+            f"{fields_without_issues}/{total_filled} data fields accurate ({accuracy_score:.1f}%). "
+            f"{fields_with_issues} quality issue(s) detected."
         )
 
         logger.info(
             "Validation complete",
             accuracy=accuracy_score,
             completeness=completeness_score,
-            corrections_count=len(corrections)
+            quality_issues_count=fields_with_issues
         )
 
         return ValidationReport(
-            is_valid=True,  # If we got here, Pydantic accepted the data
             accuracy_score=accuracy_score,
             completeness_score=completeness_score,
-            corrections=corrections,
+            corrections=quality_issues,
             filled_count=filled_count,
             total_count=total_count,
             missing_fields=missing_fields,
             summary=summary
         )
-
-    def _find_corrections(
-        self,
-        raw_dict: Dict[str, Any],
-        validated_dict: Dict[str, Any]
-    ) -> List[FieldCorrection]:
-        """
-        Find fields that were corrected by Pydantic validation.
-
-        Args:
-            raw_dict: Raw GPT-4o output
-            validated_dict: Pydantic validated output
-
-        Returns:
-            List of FieldCorrection objects
-        """
-        corrections = []
-
-        # Compare all fields
-        for key in validated_dict.keys():
-            raw_value = raw_dict.get(key)
-            validated_value = validated_dict.get(key)
-
-            # Skip if both are None or empty
-            if not raw_value and not validated_value:
-                continue
-
-            # Handle nested dicts (dates, address, medical fields)
-            if isinstance(validated_value, dict):
-                nested_corrections = self._compare_nested(key, raw_value, validated_value)
-                corrections.extend(nested_corrections)
-            # Handle simple values
-            elif str(raw_value) != str(validated_value):
-                corrections.append(
-                    FieldCorrection(
-                        field=key,
-                        raw_value=str(raw_value) if raw_value else "",
-                        validated_value=str(validated_value) if validated_value else "",
-                        reason=self._get_reason(key, raw_value, validated_value),
-                        auto_corrected=True
-                    )
-                )
-
-        return corrections
-
-    def _compare_nested(
-        self,
-        parent_key: str,
-        raw_value: Any,
-        validated_value: Dict[str, Any]
-    ) -> List[FieldCorrection]:
-        """Compare nested dictionary fields."""
-        corrections = []
-
-        if not isinstance(raw_value, dict):
-            return corrections
-
-        for nested_key, validated_nested in validated_value.items():
-            raw_nested = raw_value.get(nested_key)
-
-            if str(raw_nested) != str(validated_nested):
-                full_key = f"{parent_key}.{nested_key}"
-                corrections.append(
-                    FieldCorrection(
-                        field=full_key,
-                        raw_value=str(raw_nested) if raw_nested else "",
-                        validated_value=str(validated_nested) if validated_nested else "",
-                        reason=self._get_reason(full_key, raw_nested, validated_nested),
-                        auto_corrected=True
-                    )
-                )
-
-        return corrections
-
-    def _get_reason(self, field: str, raw_value: Any, validated_value: Any) -> str:
-        """Generate human-readable reason for correction."""
-        # Phone number corrections
-        if "טלפון" in field or "Phone" in field:
-            if "נייד" in field or "mobile" in field.lower():
-                return "Israeli mobile phone numbers must start with 05"
-            return "Phone number format corrected"
-
-        # ID number corrections
-        if "זהות" in field or "idNumber" in field:
-            return "Israeli ID number normalized to 9 digits"
-
-        # Date corrections
-        if "תאריך" in field or "date" in field.lower():
-            return "Date format normalized"
-
-        # Address corrections
-        if "כתובת" in field or "address" in field.lower():
-            return "Address field normalized"
-
-        # Generic
-        return "Field value normalized during validation"
 
     def _count_non_empty_fields(self, data_dict: Dict[str, Any]) -> int:
         """Count total non-empty fields in the data (including nested)."""

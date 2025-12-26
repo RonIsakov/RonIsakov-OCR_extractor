@@ -1,8 +1,8 @@
 """
 Pydantic models for validation reports.
 
-This module defines models for tracking the delta between GPT-4o raw extraction
-and Pydantic validated output, providing accuracy and completeness metrics.
+This module defines models for quality validation of Pydantic-validated form data,
+providing accuracy and completeness metrics based on format compliance.
 """
 
 from typing import List, Optional
@@ -11,20 +11,19 @@ from pydantic import BaseModel, Field
 
 class FieldCorrection(BaseModel):
     """
-    Represents a single field that was auto-corrected by Pydantic validation.
+    Represents a quality issue found in a field.
 
-    Tracks the difference between raw GPT-4o extraction and validated output,
-    helping users understand what was automatically fixed.
+    Quality issues are format violations like non-numeric ID, wrong phone length, etc.
     """
 
-    field: str = Field(description="Field name that was corrected")
-    raw_value: str = Field(description="Original value from GPT-4o extraction")
-    validated_value: str = Field(description="Corrected value after Pydantic validation")
-    reason: str = Field(description="Explanation of why correction was needed")
-    auto_corrected: bool = Field(default=True, description="Whether field was auto-corrected")
+    field: str = Field(description="Field name with quality issue")
+    raw_value: str = Field(description="Field value")
+    validated_value: str = Field(description="Field value (same as raw_value)")
+    reason: str = Field(description="Explanation of quality issue")
+    auto_corrected: bool = Field(default=False, description="Always False for quality issues")
     issue_type: str = Field(
-        default="correction",
-        description="Type of issue: 'correction' (auto-fixed) or 'quality' (not fixable)"
+        default="quality",
+        description="Always 'quality'"
     )
 
     class Config:
@@ -43,31 +42,27 @@ class FieldCorrection(BaseModel):
 
 class ValidationReport(BaseModel):
     """
-    Complete validation report comparing raw extraction vs validated output.
+    Quality validation report for form data.
 
     Provides:
-    - Accuracy: How many fields GPT-4o extracted correctly (no corrections needed)
+    - Accuracy: Percentage of filled fields without quality issues
     - Completeness: Percentage of fields that are filled
-    - Corrections list: What Pydantic auto-fixed
+    - Corrections: List of quality issues found
     """
-
-    is_valid: bool = Field(
-        description="Overall validation status (True if Pydantic accepted the data)"
-    )
 
     accuracy_score: float = Field(
         ge=0, le=100,
-        description="Accuracy percentage: (unchanged fields / total non-empty fields) × 100"
+        description="(fields without quality issues / total filled fields) * 100"
     )
 
     completeness_score: float = Field(
         ge=0, le=100,
-        description="Completeness percentage: (filled fields / total fields) × 100"
+        description="(filled fields / total fields) * 100"
     )
 
     corrections: List[FieldCorrection] = Field(
         default_factory=list,
-        description="List of fields that were auto-corrected by Pydantic"
+        description="List of quality issues found"
     )
 
     filled_count: int = Field(
@@ -91,21 +86,21 @@ class ValidationReport(BaseModel):
         """Pydantic model configuration."""
         json_schema_extra = {
             "example": {
-                "is_valid": True,
                 "accuracy_score": 94.4,
                 "completeness_score": 85.7,
                 "corrections": [
                     {
-                        "field": "mobilePhone",
-                        "raw_value": "6502474947",
-                        "validated_value": "0502474947",
-                        "reason": "Israeli mobile phone numbers must start with 05",
-                        "auto_corrected": True
+                        "field": "טלפון נייד",
+                        "raw_value": "502474947",
+                        "validated_value": "502474947",
+                        "reason": "Israeli phone numbers should start with 0",
+                        "auto_corrected": False,
+                        "issue_type": "quality"
                     }
                 ],
                 "filled_count": 18,
                 "total_count": 21,
-                "missing_fields": ["landlinePhone", "entrance", "poBox"],
-                "summary": "Validation passed. 18/21 fields filled (85.7%). 17/18 data fields accurate (94.4%). 1 field auto-corrected."
+                "missing_fields": ["טלפון קווי", "כניסה", "תא דואר"],
+                "summary": "Validation passed. 18/21 fields filled (85.7%). 17/18 data fields accurate (94.4%). 1 quality issue(s) detected."
             }
         }
