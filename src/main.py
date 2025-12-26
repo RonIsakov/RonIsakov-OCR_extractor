@@ -218,35 +218,3 @@ class FormProcessor:
             "All outputs saved successfully",
             output_directory=str(output_path)
         )
-
-
-def main():
-    """Example usage of FormProcessor."""
-    # Example: Process a single document
-    processor = FormProcessor()
-
-    # Process example document
-    file_path = "data/input/283_ex1.pdf"
-
-    try:
-        form_data, metadata, validation_report = processor.process_document(
-            file_path=file_path,
-            save_output=True
-        )
-
-        print("\n" + "="*70)
-        print("PROCESSING COMPLETE")
-        print("="*70)
-        print(f"\nFile: {file_path}")
-        print(f"\nValidation Report:")
-        print(f"  Accuracy: {validation_report.accuracy_score:.1f}%")
-        print(f"  Completeness: {validation_report.completeness_score:.1f}%")
-        print(f"  Quality Issues: {len(validation_report.corrections)}")
-        print(f"\nOutputs saved to: data/output/")
-
-    except Exception as e:
-        print(f"\nError processing document: {e}")
-
-
-if __name__ == "__main__":
-    main()

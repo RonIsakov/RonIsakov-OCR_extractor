@@ -49,47 +49,36 @@ class OpenAIService:
 
     def extract_fields(self, ocr_text: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
-        Extract structured fields from OCR text using GPT-4o.
-
-        This method:
-        1. Generates extraction prompt with OCR text
-        2. Calls GPT-4o with JSON mode enabled
-        3. Parses and validates the response
-        4. Returns extracted data and metadata
+        Extract structured fields from OCR text using GPT-4o with JSON mode.
 
         Args:
             ocr_text: Raw OCR text extracted from Form 283
 
         Returns:
-            Tuple of:
-                - extracted_data (dict): Parsed JSON with form fields
-                - metadata (dict): Token usage, model info, etc.
+            Tuple of (extracted_data, metadata) where:
+                - extracted_data: Parsed JSON with form fields
+                - metadata: Token usage and model info
 
         Raises:
-            ValueError: If JSON parsing fails or response is invalid
+            ValueError: If JSON parsing fails
             Exception: If API call fails
         """
         logger.info("Starting field extraction", ocr_length=len(ocr_text))
 
         try:
-            # Generate the extraction prompt
             user_prompt = get_extraction_prompt(ocr_text)
 
-            # Call Azure OpenAI GPT-4o with JSON mode
             response: ChatCompletion = self.client.chat.completions.create(
                 model=self.deployment_name,
                 messages=[
                     {"role": "system", "content": SYSTEM_MESSAGE},
                     {"role": "user", "content": user_prompt}
                 ],
-                response_format={"type": "json_object"},  # Enable JSON mode
+                response_format={"type": "json_object"},
                 temperature=self.temperature
             )
 
-            # Extract the response content
             raw_json = response.choices[0].message.content
-
-            # Log token usage for cost tracking
             usage = response.usage
             logger.info(
                 "OpenAI API call successful",
@@ -99,14 +88,12 @@ class OpenAIService:
                 model=response.model
             )
 
-            # Parse JSON response
             try:
                 extracted_data = json.loads(raw_json)
             except json.JSONDecodeError as e:
                 logger.error("Failed to parse JSON response", error=str(e), raw_response=raw_json[:500])
                 raise ValueError(f"Invalid JSON response from GPT-4o: {e}")
 
-            # Prepare metadata
             metadata = {
                 "model": response.model,
                 "prompt_tokens": usage.prompt_tokens,
@@ -133,34 +120,26 @@ class OpenAIService:
         ocr_text: str
     ) -> Tuple[Form283Data, Dict[str, Any], ValidationReport]:
         """
-        Extract fields and validate with quality checks.
-
-        This method:
-        1. Extracts fields using extract_fields() (GPT-4o extraction)
-        2. Validates against Form283Data Pydantic model
-        3. Runs quality checks on validated data
-        4. Returns validated data + validation report
+        Extract fields from OCR text and validate with Pydantic schema and quality checks.
 
         Args:
             ocr_text: Raw OCR text extracted from Form 283
 
         Returns:
-            Tuple of:
-                - form_data (Form283Data): Validated Pydantic model instance
-                - metadata (dict): Token usage and API metadata
-                - validation_report (ValidationReport): Accuracy and completeness metrics
+            Tuple of (form_data, metadata, validation_report) where:
+                - form_data: Validated Form283Data instance
+                - metadata: Token usage and API metadata
+                - validation_report: Accuracy and completeness metrics
 
         Raises:
             ValidationError: If extracted data doesn't match schema
             ValueError: If JSON parsing fails
             Exception: If API call fails
         """
-        logger.info("Starting extraction with validation and quality checks")
+        logger.info("Starting extraction with validation")
 
-        # Step 1: Extract fields (GPT-4o extraction)
         raw_extracted_data, metadata = self.extract_fields(ocr_text)
 
-        # Step 2: Validate against Pydantic schema
         try:
             form_data = Form283Data(**raw_extracted_data)
             logger.info(
@@ -178,7 +157,6 @@ class OpenAIService:
             )
             raise
 
-        # Step 3: Run quality checks on validated data
         validation_service = ValidationService()
         validation_report = validation_service.validate(form_data)
 

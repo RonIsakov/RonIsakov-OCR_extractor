@@ -11,31 +11,23 @@ from pydantic import BaseModel, Field
 
 class FieldCorrection(BaseModel):
     """
-    Represents a quality issue found in a field.
+    Represents a quality issue detected in a validated field.
 
-    Quality issues are format violations like non-numeric ID, wrong phone length, etc.
+    Reports format violations (e.g., ID not 9 digits, phone missing leading zero,
+    OCR failure patterns) without modifying the data.
     """
 
     field: str = Field(description="Field name with quality issue")
-    raw_value: str = Field(description="Field value")
-    validated_value: str = Field(description="Field value (same as raw_value)")
-    reason: str = Field(description="Explanation of quality issue")
-    auto_corrected: bool = Field(default=False, description="Always False for quality issues")
-    issue_type: str = Field(
-        default="quality",
-        description="Always 'quality'"
-    )
+    value: str = Field(description="Field value that has the quality issue")
+    reason: str = Field(description="Description of the quality issue")
 
     class Config:
         """Pydantic model configuration."""
         json_schema_extra = {
             "example": {
-                "field": "mobilePhone",
-                "raw_value": "6502474947",
-                "validated_value": "0502474947",
-                "reason": "Israeli mobile phone numbers must start with 05",
-                "auto_corrected": True,
-                "issue_type": "correction"
+                "field": "טלפון נייד",
+                "value": "502474947",
+                "reason": "Israeli phone numbers should start with 0"
             }
         }
 
@@ -91,11 +83,8 @@ class ValidationReport(BaseModel):
                 "corrections": [
                     {
                         "field": "טלפון נייד",
-                        "raw_value": "502474947",
-                        "validated_value": "502474947",
-                        "reason": "Israeli phone numbers should start with 0",
-                        "auto_corrected": False,
-                        "issue_type": "quality"
+                        "value": "502474947",
+                        "reason": "Israeli phone numbers should start with 0"
                     }
                 ],
                 "filled_count": 18,

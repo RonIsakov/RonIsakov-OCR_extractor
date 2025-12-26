@@ -213,7 +213,7 @@ class Form283Data(BaseModel):
     accidentLocation: str = Field(
         default="",
         alias="מקום התאונה",
-        description="Accident location type (מקום התאונה): במפעל/ת.דרכים/אחר"
+        description="Accident location type (מקום התאונה): במפעל/ת. דרכים בעבודה/ת. דרכים בדרך לעבודה/מהעבודה/תאונה בדרך ללא רכב/אחר"
     )
     accidentAddress: str = Field(
         default="",
@@ -235,7 +235,7 @@ class Form283Data(BaseModel):
     signature: str = Field(
         default="",
         alias="חתימה",
-        description="Signature or name of applicant (חתימה)"
+        description="Signature (חתימה)"
     )
 
     # Form Metadata

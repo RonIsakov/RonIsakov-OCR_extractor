@@ -16,7 +16,6 @@ class Settings(BaseSettings):
         AZURE_DI_KEY=your_key_here
         AZURE_OPENAI_ENDPOINT=https://your-endpoint.openai.azure.com/
         AZURE_OPENAI_KEY=your_key_here
-        etc.
     """
 
     # Azure Document Intelligence Configuration

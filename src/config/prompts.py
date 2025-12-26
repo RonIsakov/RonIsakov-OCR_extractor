@@ -127,23 +127,40 @@ FIELD EXTRACTION RULES:
    - תא דואר (poBox / PO Box): PO Box (if applicable, usually empty)
 
 3. **Contact Information (פרטי קשר / Contact Details)**:
-   - טלפון קווי (landlinePhone / Landline Phone): Landline phone (9 digits, starts with 0)
-   - טלפון נייד (mobilePhone / Mobile Phone): Mobile phone (10 digits, starts with 05)
-   - Remove dashes and spaces from phone numbers
+   - טלפון קווי (landlinePhone / Landline Phone): Israeli landline phone number
+     • Must be 9 digits total, ALWAYS starts with 0 (zero)
+     • Remove dashes/spaces/parentheses, but preserve ALL digits including leading 0
+     • Example: "09-765-6054" → "097656054"
+   - טלפון נייד (mobilePhone / Mobile Phone): Israeli mobile phone number
+     • Must be 10 digits total, ALWAYS starts with 05 (zero-five)
+     • CRITICAL: Do NOT confuse 0 (zero) with 6 or O (letter) in handwriting
+     • Remove dashes/spaces/parentheses, but preserve ALL digits including leading 0
+     • Example: "055-441-2742" → "0554412742" (NOT "6554412742")
 
 4. **Injury Details (פרטי התאונה / Accident Details)**:
    - סוג העבודה (jobType / Job Type): Type of work/occupation in original language
    - תאריך הפגיעה (dateOfInjury / Date of Injury): Injury date as {יום/day, חודש/month, שנה/year}
    - שעת הפגיעה (timeOfInjury / Time of Injury): Time of injury (HH:MM format)
-   - מקום התאונה (accidentLocation / Accident Location): Location type
-     Hebrew: "במפעל" (at factory), "ת. דרכים בעבודה" (traffic accident), "אחר" (other)
-     English: "At workplace", "Traffic accident", "Other"
+   - מקום התאונה (accidentLocation / Accident Location): CRITICAL - This is a checkbox field with exactly 5 options:
+     Hebrew options (extract EXACTLY as marked):
+       • "במפעל" - At the workplace/factory
+       • "ת. דרכים בעבודה" - Traffic accident during work
+       • "ת. דרכים בדרך לעבודה/מהעבודה" - Traffic accident on the way to/from work
+       • "תאונה בדרך ללא רכב" - Accident on the way without vehicle
+       • "אחר" - Other (if this is selected, there should be additional text after it on the blank line - include that text)
+     IMPORTANT: Extract whichever checkbox is marked. If "אחר" is selected AND has text after it, include that explanation.
    - כתובת מקום התאונה (accidentAddress / Accident Address): Full address where accident occurred
    - תיאור התאונה (accidentDescription / Accident Description): Description in original language
    - האיבר שנפגע (injuredBodyPart / Injured Body Part): Body part in original language
 
 5. **Declaration (הצהרה / Declaration)**:
-   - חתימה (signature / Signature): Name of person signing (usually same as applicant name)
+   - חתימה (signature / Signature): The actual signature or mark
+     • This is DIFFERENT from שם המבקש (applicant name)
+     • May appear as handwritten signature, typed name, or mark like "X"
+     • May show as "חתימהX" or actual name if signed
+     • Extract ONLY what appears after "חתימה" labele.
+     • If appears empty, use empty string ""
+     • If a sign for example "X" appears after "חתימה" labele, use empty string ""
 
 6. **Form Metadata (מטא-דאטה של הטופס / Form Metadata)**:
    - תאריך מילוי הטופס (formFillingDate / Form Filling Date): Date form was filled
@@ -157,8 +174,22 @@ FIELD EXTRACTION RULES:
    - אבחנות רפואיות (medicalDiagnoses / Medical Diagnoses): Medical diagnoses (often empty)
 
 DATE FORMAT RULES:
-- Dates in OCR appear in various formats: "DDMMYYYY", "DD.MM.YYYY", "DD/MM/YYYY", or separate fields
-- Extract to separate fields: {"יום": "DD", "חודש": "MM", "שנה": "YYYY"}
+- Dates in OCR appear in multiple formats - you must handle ALL of these:
+
+  Format 1: 8-digit concatenated (DDMMYYYY) - NO separators
+    • Example: "25012023" = Day:25, Month:01, Year:2023
+    • Split pattern: First 2 digits=day, next 2=month, last 4=year
+    • Common for: תאריך מילוי הטופס, תאריך קבלת הטופס בקופה
+
+  Format 2: With separators (DD.MM.YYYY or DD/MM/YYYY)
+    • Example: "25.01.2023" or "25/01/2023"
+    • Split by separator
+
+  Format 3: In separate boxes with labels
+    • OCR shows: "יום 25 חודש 01 שנה 2023" or similar
+    • Extract each component
+
+- ALWAYS extract to: {"יום": "DD", "חודש": "MM", "שנה": "YYYY"}
 - Keep leading zeros (e.g., "02" not "2")
 - If date is missing or unclear, use empty strings for all three fields
 - Accept both Hebrew and English month names (convert to numbers)
@@ -169,7 +200,18 @@ FORM 283 LAYOUT CONTEXT:
 - OCR may include labels like "שם משפחה", "ת. ז." (ID), "תאריך לידה", etc.
 - English forms may have "Last Name", "ID Number", "Date of Birth", etc.
 - Look for the actual data VALUES, not the field LABELS
-- Selected checkboxes appear as ":selected:", unselected as ":unselected:"
+
+CHECKBOX EXTRACTION RULES (CRITICAL):
+- Checkboxes appear as ":selected:" (checked) or ":unselected:" (not checked)
+- In Hebrew RTL text, the checkbox marker appears IMMEDIATELY BEFORE the option name
+- Pattern: ":selected: <option>" = that option IS selected
+- Pattern: ":unselected: <option>" = that option is NOT selected
+- Example from OCR: ":unselected: מכבי :selected: מאוחדת :unselected: כללית"
+  → מאוחדת is SELECTED (has :selected: immediately before it)
+  → מכבי is NOT selected (has :unselected: before it)
+  → Extract: "חבר בקופת חולים": "מאוחדת"
+- ALWAYS match the checkbox marker to the option name that follows it
+- For health fund field: Only extract the ONE option with ":selected:" before it
 
 CRITICAL RULES:
 - Use empty string "" for missing fields, NOT null or undefined
@@ -197,42 +239,3 @@ Return ONLY the JSON object with extracted data. Use empty strings ("") for miss
 Remember: Hebrew field names in output, but preserve VALUE language from OCR."""
 
     return prompt
-
-
-# Example usage documentation
-USAGE_EXAMPLE = """
-# How to use these prompts with Azure OpenAI:
-
-from openai import AzureOpenAI
-from src.config.prompts import SYSTEM_MESSAGE, get_extraction_prompt
-
-client = AzureOpenAI(
-    api_key="your_key",
-    api_version="2024-02-15-preview",
-    azure_endpoint="your_endpoint"
-)
-
-# Extract OCR text first
-ocr_text = "... extracted text from Form 283 ..."
-
-# Call GPT-4o with JSON mode
-response = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[
-        {"role": "system", "content": SYSTEM_MESSAGE},
-        {"role": "user", "content": get_extraction_prompt(ocr_text)}
-    ],
-    response_format={"type": "json_object"},  # Enable JSON mode
-    temperature=0.1  # Low temperature for consistency
-)
-
-# Get extracted JSON
-extracted_json = response.choices[0].message.content
-
-# Parse and validate with Pydantic
-import json
-from src.models.schemas import Form283Data
-
-data_dict = json.loads(extracted_json)
-form_data = Form283Data(**data_dict)  # Validates against schema
-"""

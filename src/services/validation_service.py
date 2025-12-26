@@ -1,17 +1,11 @@
 """
 Validation service for quality checking and accuracy tracking.
 
-This module:
-- Validates Pydantic-validated form data for quality issues
-- Performs quality checks on validated data (format violations, wrong values)
-- Reports issues without blocking (permissive validation)
-- Calculates accuracy and completeness scores
-
-this service checks
-the Pydantic output for quality issues. It checks numeric formats, value ranges,
-and Israeli-specific rules (ID length, phone format, etc.) and reports violations.
+Validates Pydantic-validated form data for quality issues (format violations,
+Israeli-specific rules) without blocking. Calculates accuracy and completeness scores.
 """
 
+from datetime import datetime
 from typing import Dict, Any, List
 from src.models.schemas import Form283Data
 from src.models.validation import ValidationReport, FieldCorrection
@@ -45,26 +39,18 @@ class ValidationService:
         """
         logger.info("Starting quality validation")
 
-        # Get validated data as dict
         validated_dict = validated_form.model_dump(by_alias=True)
-
-        # Check for quality issues (fields that don't meet format rules)
         quality_issues = self._check_field_quality(validated_dict)
 
-        # Calculate accuracy (fields without quality issues / total filled fields)
         total_filled = self._count_non_empty_fields(validated_dict)
         fields_with_issues = len(quality_issues)
         fields_without_issues = total_filled - fields_with_issues
         accuracy_score = (fields_without_issues / total_filled * 100) if total_filled > 0 else 100.0
 
-        # Get completeness from existing methods
         filled_count, total_count = validated_form.get_filled_fields_count()
         completeness_score = validated_form.get_completeness_percentage()
-
-        # Calculate missing fields
         missing_fields = self._get_missing_fields(validated_dict)
 
-        # Generate summary
         summary = (
             f"Validation passed. {filled_count}/{total_count} fields filled ({completeness_score:.1f}%). "
             f"{fields_without_issues}/{total_filled} data fields accurate ({accuracy_score:.1f}%). "
@@ -94,9 +80,8 @@ class ValidationService:
 
         for value in data_dict.values():
             if isinstance(value, dict):
-                # Count nested fields
                 count += self._count_non_empty_fields(value)
-            elif value:  # Non-empty value
+            elif value:
                 count += 1
 
         return count
@@ -109,10 +94,9 @@ class ValidationService:
             full_key = f"{prefix}.{key}" if prefix else key
 
             if isinstance(value, dict):
-                # Check nested fields
                 nested_missing = self._get_missing_fields(value, full_key)
                 missing.extend(nested_missing)
-            elif not value:  # Empty value
+            elif not value:
                 missing.append(full_key)
 
         return missing
@@ -124,42 +108,45 @@ class ValidationService:
         """
         Check validated data for quality issues.
 
-        These are issues that Pydantic couldn't auto-correct,
-        like non-numeric characters in numeric fields.
+        Checks format violations
+        (non-numeric characters, wrong lengths, invalid ranges, OCR failures).
 
         Returns:
-            List of quality issues (marked as issue_type='quality')
+            List of quality issues
         """
         quality_issues = []
 
-        # Check ID number quality
         id_number = validated_dict.get("מספר זהות", "")
         if id_number:
-            # Strip separators for checking (but keep original value in report)
             cleaned_id = id_number.replace(" ", "").replace("-", "")
 
             if not cleaned_id.isdigit():
                 quality_issues.append(
                     FieldCorrection(
                         field="מספר זהות",
-                        raw_value=id_number,
-                        validated_value=id_number,
-                        reason="ID number contains non-numeric characters",
-                        auto_corrected=False,
-                        issue_type="quality"
+                        value=id_number,
+                        reason="ID number contains non-numeric characters"
                     )
                 )
             elif len(cleaned_id) != 9:
                 quality_issues.append(
                     FieldCorrection(
                         field="מספר זהות",
-                        raw_value=id_number,
-                        validated_value=id_number,
-                        reason=f"ID number should be 9 digits, got {len(cleaned_id)}",
-                        auto_corrected=False,
-                        issue_type="quality"
+                        value=id_number,
+                        reason=f"ID number should be 9 digits, got {len(cleaned_id)}"
                     )
                 )
+
+        # Check last name for OCR failure pattern
+        last_name = validated_dict.get("שם משפחה", "")
+        if last_name and "ס״ב" in last_name:
+            quality_issues.append(
+                FieldCorrection(
+                    field="שם משפחה",
+                    value=last_name,
+                    reason="OCR failed to read last name - detected 'ס״ב' marker instead of actual name"
+                )
+            )
 
         # Check mobile phone quality
         mobile = validated_dict.get("טלפון נייד", "")
@@ -171,73 +158,54 @@ class ValidationService:
                 quality_issues.append(
                     FieldCorrection(
                         field="טלפון נייד",
-                        raw_value=mobile,
-                        validated_value=mobile,
-                        reason="Phone number contains non-numeric characters",
-                        auto_corrected=False,
-                        issue_type="quality"
+                        value=mobile,
+                        reason="Phone number contains non-numeric characters"
                     )
                 )
             elif not cleaned_mobile.startswith("0"):
                 quality_issues.append(
                     FieldCorrection(
                         field="טלפון נייד",
-                        raw_value=mobile,
-                        validated_value=mobile,
-                        reason="Israeli phone numbers should start with 0",
-                        auto_corrected=False,
-                        issue_type="quality"
+                        value=mobile,
+                        reason="Israeli phone numbers should start with 0"
                     )
                 )
             elif cleaned_mobile.startswith("05") and len(cleaned_mobile) != 10:
                 quality_issues.append(
                     FieldCorrection(
                         field="טלפון נייד",
-                        raw_value=mobile,
-                        validated_value=mobile,
-                        reason=f"Mobile phone should be 10 digits, got {len(cleaned_mobile)}",
-                        auto_corrected=False,
-                        issue_type="quality"
+                        value=mobile,
+                        reason=f"Mobile phone should be 10 digits, got {len(cleaned_mobile)}"
                     )
                 )
 
         # Check landline phone quality
         landline = validated_dict.get("טלפון קווי", "")
         if landline:
-            # Strip separators for checking (but keep original value in report)
             cleaned_landline = landline.replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
 
             if not cleaned_landline.isdigit():
                 quality_issues.append(
                     FieldCorrection(
                         field="טלפון קווי",
-                        raw_value=landline,
-                        validated_value=landline,
-                        reason="Phone number contains non-numeric characters",
-                        auto_corrected=False,
-                        issue_type="quality"
+                        value=landline,
+                        reason="Phone number contains non-numeric characters"
                     )
                 )
             elif not cleaned_landline.startswith("0"):
                 quality_issues.append(
                     FieldCorrection(
                         field="טלפון קווי",
-                        raw_value=landline,
-                        validated_value=landline,
-                        reason="Israeli phone numbers should start with 0",
-                        auto_corrected=False,
-                        issue_type="quality"
+                        value=landline,
+                        reason="Israeli phone numbers should start with 0"
                     )
                 )
             elif not cleaned_landline.startswith("05") and cleaned_landline.startswith("0") and len(cleaned_landline) != 9:
                 quality_issues.append(
                     FieldCorrection(
                         field="טלפון קווי",
-                        raw_value=landline,
-                        validated_value=landline,
-                        reason=f"Landline phone should be 9 digits, got {len(cleaned_landline)}",
-                        auto_corrected=False,
-                        issue_type="quality"
+                        value=landline,
+                        reason=f"Landline phone should be 9 digits, got {len(cleaned_landline)}"
                     )
                 )
 
@@ -251,22 +219,16 @@ class ValidationService:
                     quality_issues.append(
                         FieldCorrection(
                             field=f"{date_field_name}.יום",
-                            raw_value=day,
-                            validated_value=day,
-                            reason="Day must be numeric",
-                            auto_corrected=False,
-                            issue_type="quality"
+                            value=day,
+                            reason="Day must be numeric"
                         )
                     )
                 elif day and day.isdigit() and not (1 <= int(day) <= 31):
                     quality_issues.append(
                         FieldCorrection(
                             field=f"{date_field_name}.יום",
-                            raw_value=day,
-                            validated_value=day,
-                            reason=f"Day must be 1-31, got {day}",
-                            auto_corrected=False,
-                            issue_type="quality"
+                            value=day,
+                            reason=f"Day must be 1-31, got {day}"
                         )
                     )
 
@@ -276,22 +238,16 @@ class ValidationService:
                     quality_issues.append(
                         FieldCorrection(
                             field=f"{date_field_name}.חודש",
-                            raw_value=month,
-                            validated_value=month,
-                            reason="Month must be numeric",
-                            auto_corrected=False,
-                            issue_type="quality"
+                            value=month,
+                            reason="Month must be numeric"
                         )
                     )
                 elif month and month.isdigit() and not (1 <= int(month) <= 12):
                     quality_issues.append(
                         FieldCorrection(
                             field=f"{date_field_name}.חודש",
-                            raw_value=month,
-                            validated_value=month,
-                            reason=f"Month must be 1-12, got {month}",
-                            auto_corrected=False,
-                            issue_type="quality"
+                            value=month,
+                            reason=f"Month must be 1-12, got {month}"
                         )
                     )
 
@@ -301,25 +257,19 @@ class ValidationService:
                     quality_issues.append(
                         FieldCorrection(
                             field=f"{date_field_name}.שנה",
-                            raw_value=year,
-                            validated_value=year,
-                            reason="Year must be numeric",
-                            auto_corrected=False,
-                            issue_type="quality"
+                            value=year,
+                            reason="Year must be numeric"
                         )
                     )
                 elif year and year.isdigit():
                     year_int = int(year)
-                    current_year = 2025  # Could use datetime.now().year but keeping simple
+                    current_year = datetime.now().year
                     if not (1900 <= year_int <= current_year + 1):
                         quality_issues.append(
                             FieldCorrection(
                                 field=f"{date_field_name}.שנה",
-                                raw_value=year,
-                                validated_value=year,
-                                reason=f"Year should be 1900-{current_year+1}, got {year}",
-                                auto_corrected=False,
-                                issue_type="quality"
+                                value=year,
+                                reason=f"Year should be 1900-{current_year+1}, got {year}"
                             )
                         )
 
@@ -335,22 +285,16 @@ class ValidationService:
                     quality_issues.append(
                         FieldCorrection(
                             field="כתובת.מיקוד",
-                            raw_value=postal_code,
-                            validated_value=postal_code,
-                            reason="Postal code must be numeric",
-                            auto_corrected=False,
-                            issue_type="quality"
+                            value=postal_code,
+                            reason="Postal code must be numeric"
                         )
                     )
                 elif not (5 <= len(cleaned_postal) <= 7):
                     quality_issues.append(
                         FieldCorrection(
                             field="כתובת.מיקוד",
-                            raw_value=postal_code,
-                            validated_value=postal_code,
-                            reason=f"Postal code should be 5-7 digits, got {len(cleaned_postal)}",
-                            auto_corrected=False,
-                            issue_type="quality"
+                            value=postal_code,
+                            reason=f"Postal code should be 5-7 digits, got {len(cleaned_postal)}"
                         )
                     )
 
