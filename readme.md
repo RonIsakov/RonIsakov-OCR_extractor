@@ -1,222 +1,410 @@
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/ed5b23ba-3e7e-46fd-a18c-8fcc520bee52" alt="kpmg-logo-1" width="200" />
-</p>
+# Form 283 Extraction System
 
-<h1 align="center">GenAI Developer Assessment Assignment</h1>
+AI-powered system for extracting and validating structured data from Israeli National Insurance Form 283 (workplace injury forms) using Azure Document Intelligence and GPT-4o.
 
+![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)
+![Azure](https://img.shields.io/badge/Azure-Document_Intelligence-0089D6)
+![Azure](https://img.shields.io/badge/Azure-OpenAI_GPT--4o-0089D6)
 
-You are given 4 days to complete this assessment. For this assignment, you have access to the following Azure OpenAI resources:
+## Features
 
-- Document Intelligence for Optical Character Recognition (OCR)
-- GPT-4o and GPT-4o Mini as Large Language Models (LLMs)
-- ADA 002 for text embeddings
+- **Multi-language Support**: Processes forms filled in Hebrew, English, or mixed languages
+- **Azure Document Intelligence OCR**: Extracts text from PDF documents using prebuilt-layout model
+- **GPT-4o Field Extraction**: Structured data extraction with JSON mode for reliable output
+- **Pydantic Schema Validation**: Type-safe data models with Hebrew field aliases
+- **Quality Validation**: Automated accuracy and completeness scoring with Israeli format validation
+- **Web Interface**: User-friendly Streamlit UI for document upload and result visualization
+- **Structured Logging**: Comprehensive logging with structlog (console and file output)
+- **Error Handling**: Graceful handling of OCR errors and missing fields
 
-All required resources have already been deployed in Azure. There is no need to create additional resources for this assignment.
+## Table of Contents
 
-The necessary Azure credentials have been included in the email containing this assignment. Please refer to these credentials for accessing the pre-deployed resources.
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+  - [Streamlit Web UI](#streamlit-web-ui)
+  - [Python API](#python-api)
+- [Project Structure](#project-structure)
+- [Architecture](#architecture)
+- [Output Format](#output-format)
+- [Quality Validation](#quality-validation)
+- [Testing](#testing)
+- [Logging](#logging)
+- [Known Limitations](#known-limitations)
 
-## **IMPORTANT NOTE:** Use only the native Azure OpenAI SDK library, not LangChain or other frameworks.
+## Prerequisites
 
+- **Python**: 3.10 or higher
+- **Azure Resources**:
+  - Azure Document Intelligence instance with prebuilt-layout model support
+  - Azure OpenAI instance with GPT-4o deployment
+  - API version: `2024-02-15-preview` or later
+- **Git**: For cloning the repository (optional)
 
-## Repository Contents
+## Installation
 
-The Git repository for this assignment contains two important folders:
+```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd Home-Assignment-GenAI-KPMG
 
-- **phase1_data**: This folder contains:
-  - 1 raw PDF file that you can use to create more examples if needed
-  - 3 filled documents for testing and development
+# 2. Create and activate virtual environment
+python -m venv venv
 
-- **phase2_data**: This folder contains:
-  - HTML files that serve as the knowledge base for Part 2 of the home assignment
+# On Windows:
+venv\Scripts\activate
 
-## Part 1: Field Extraction using Document Intelligence & Azure OpenAI
+# On macOS/Linux:
+source venv/bin/activate
 
-### Task
-Develop a system that extracts information from ביטוח לאומי (National Insurance Institute) forms using OCR and Azure OpenAI.
-
-### Requirements
-1. Use Azure Document Intelligence for OCR. [Learn more about Document Intelligence layout](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/concept-layout?view=doc-intel-4.0.0&tabs=sample-code)
-2. Use Azure OpenAI to extract fields and generate JSON output.
-3. Create a simple UI to upload a PDF/JPG file and display the resulting JSON. You can use **Streamlit** or **Gradio** for the UI implementation.
-4. Handle forms filled in either Hebrew or English.
-5. For any fields not present or not extractable, use an empty string in the JSON output.
-6. Implement a method to validate the accuracy and completeness of the extracted data.
-
-### Desired Output Format:
-```json
-{
-  "lastName": "",
-  "firstName": "",
-  "idNumber": "",
-  "gender": "",
-  "dateOfBirth": {
-    "day": "",
-    "month": "",
-    "year": ""
-  },
-  "address": {
-    "street": "",
-    "houseNumber": "",
-    "entrance": "",
-    "apartment": "",
-    "city": "",
-    "postalCode": "",
-    "poBox": ""
-  },
-  "landlinePhone": "",
-  "mobilePhone": "",
-  "jobType": "",
-  "dateOfInjury": {
-    "day": "",
-    "month": "",
-    "year": ""
-  },
-  "timeOfInjury": "",
-  "accidentLocation": "",
-  "accidentAddress": "",
-  "accidentDescription": "",
-  "injuredBodyPart": "",
-  "signature": "",
-  "formFillingDate": {
-    "day": "",
-    "month": "",
-    "year": ""
-  },
-  "formReceiptDateAtClinic": {
-    "day": "",
-    "month": "",
-    "year": ""
-  },
-  "medicalInstitutionFields": {
-    "healthFundMember": "",
-    "natureOfAccident": "",
-    "medicalDiagnoses": ""
-  }
-}
+# 3. Install dependencies
+pip install -r requirements.txt
 ```
-Here is a translation of the fields in Hebrew: 
+
+## Configuration
+
+### Step 1: Create `.env` File
+
+Create a `.env` file in the project root directory:
+
+```env
+# Azure Document Intelligence Configuration
+AZURE_DI_ENDPOINT=https://<your-resource>.cognitiveservices.azure.com/
+AZURE_DI_KEY=<your_document_intelligence_key>
+
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
+AZURE_OPENAI_KEY=<your_openai_key>
+AZURE_OPENAI_API_VERSION=2024-02-15-preview
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
+
+# Optional Application Settings (defaults shown)
+LOG_LEVEL=INFO
+MAX_FILE_SIZE_MB=10
+DATA_INPUT_DIR=data/input
+DATA_OUTPUT_DIR=data/output
+LOGS_DIR=logs
+```
+
+### Step 2: Verify Configuration
+
+Test your Azure connections:
+
+```bash
+python tests/test_azure_connection.py
+```
+
+## Usage
+
+### Streamlit Web UI
+
+The easiest way to use the system:
+
+```bash
+streamlit run src/ui/streamlit_app.py
+```
+
+Then:
+1. Open your browser to `http://localhost:8501`
+2. Upload a PDF file (max 10MB)
+3. Click "Process Document"
+4. View the results:
+   - Extracted JSON with all form fields
+   - Validation report with accuracy and completeness scores
+   - Quality issues detected (if any)
+   - Missing fields list
+5. Download outputs (JSON, validation report, OCR text)
+
+### Python API
+
+For programmatic usage:
+
+```python
+from src.main import FormProcessor
+
+# Initialize processor
+processor = FormProcessor()
+
+# Process a document
+form_data, metadata, validation_report = processor.process_document(
+    file_path="path/to/form283.pdf",
+    save_output=True,
+    output_dir="data/output"
+)
+
+# Access validation metrics
+print(f"Completeness: {validation_report.completeness_score:.1f}%")
+print(f"Accuracy: {validation_report.accuracy_score:.1f}%")
+print(f"Quality issues: {len(validation_report.corrections)}")
+print(f"Total tokens used: {metadata['total_tokens']}")
+
+# Access extracted data with English field names
+print(f"Last Name: {form_data.lastName}")
+print(f"ID Number: {form_data.idNumber}")
+
+# Access with Hebrew field names
+hebrew_data = form_data.model_dump(by_alias=True)
+print(f"שם משפחה: {hebrew_data['שם משפחה']}")
+```
+
+## Project Structure
+
+```
+Home-Assignment-GenAI-KPMG/
+├── src/
+│   ├── config/
+│   │   ├── settings.py          # Pydantic settings management
+│   │   └── prompts.py           # GPT-4o extraction prompts
+│   ├── services/
+│   │   ├── document_intelligence.py  # Azure DI OCR service
+│   │   ├── openai_service.py        # Azure OpenAI field extraction
+│   │   └── validation_service.py    # Quality validation & scoring
+│   ├── models/
+│   │   ├── schemas.py           # Form283Data Pydantic models
+│   │   └── validation.py        # ValidationReport models
+│   ├── ui/
+│   │   └── streamlit_app.py     # Web interface
+│   ├── utils/
+│   │   └── logger.py            # Structured logging setup
+│   └── main.py                  # FormProcessor orchestrator
+├── tests/                        # Integration and unit tests
+├── data/
+│   ├── input/                   # Upload directory
+│   └── output/
+│       ├── ocr_text/            # Extracted OCR text
+│       ├── extracted_json/      # Form data JSON
+│       └── validation_reports/  # Validation reports
+├── logs/                         # Application logs
+├── requirements.txt             # Python dependencies
+├── .env                         # Azure credentials (not in git)
+└── README.md                    # This file
+```
+
+### Core Components
+
+- **[FormProcessor](src/main.py)**: Main orchestrator that coordinates the entire pipeline
+- **[DocumentIntelligenceService](src/services/document_intelligence.py)**: PDF OCR extraction using Azure Document Intelligence prebuilt-layout model
+- **[OpenAIService](src/services/openai_service.py)**: Field extraction from OCR text using GPT-4o with JSON mode
+- **[ValidationService](src/services/validation_service.py)**: Quality checking for Israeli-specific format rules
+- **[Form283Data](src/models/schemas.py)**: Pydantic model with 20+ fields and Hebrew aliases
+
+## Architecture
+
+### Processing Pipeline
+
+```
+┌─────────────┐
+│ PDF Upload  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────────────────┐
+│ Document Intelligence (OCR) │  ← Azure DI prebuilt-layout
+└──────────┬──────────────────┘
+           │ Raw OCR Text
+           ▼
+┌─────────────────────────────┐
+│   GPT-4o Field Extraction   │  ← Azure OpenAI JSON mode
+└──────────┬──────────────────┘
+           │ Raw JSON
+           ▼
+┌─────────────────────────────┐
+│   Pydantic Validation       │  ← Schema enforcement
+└──────────┬──────────────────┘
+           │ Validated Form283Data
+           ▼
+┌─────────────────────────────┐
+│   Quality Validation        │  ← Format checks, scoring
+└──────────┬──────────────────┘
+           │
+           ▼
+┌─────────────────────────────┐
+│  Output Generation          │  ← JSON, reports, OCR text
+└─────────────────────────────┘
+```
+
+### Data Models
+
+**Form283Data**: Main form structure with nested models
+- `DateField`: day/month/year components (יום, חודש, שנה)
+- `AddressField`: Israeli address structure (רחוב, מספר בית, כניסה, דירה, ישוב, מיקוד, תא דואר)
+- `MedicalFields`: Medical institution data (חבר בקופת חולים, מהות התאונה, אבחנות רפואיות)
+
+**ValidationReport**: Quality metrics
+- `accuracy_score`: Percentage of filled fields without quality issues
+- `completeness_score`: Percentage of total fields that are filled
+- `corrections`: List of FieldCorrection objects
+- `missing_fields`: List of empty field names
+- `summary`: Human-readable validation summary
+
+**FieldCorrection**: Quality issue tracking
+- `field`: Field name with quality issue
+- `value`: Field value that has the issue
+- `reason`: Description of the quality issue
+
+## Output Format
+
+The system generates three types of output files:
+
+### 1. OCR Text (`data/output/ocr_text/{filename}_extracted.txt`)
+
+Raw OCR-extracted text with metadata header:
+```
+=== Document OCR Extraction ===
+File: form283_sample.pdf
+Extracted at: 2025-01-15 14:30:45
+Pages: 2
+Text length: 1,847 characters
+===
+
+[OCR text content...]
+```
+
+### 2. Form Data (`data/output/extracted_json/{filename}_form_data.json`)
+
+Structured JSON with Hebrew field names:
 ```json
 {
-  "שם משפחה": "",
-  "שם פרטי": "",
-  "מספר זהות": "",
-  "מין": "",
+  "שם משפחה": "כהן",
+  "שם פרטי": "דוד",
+  "מספר זהות": "123456789",
   "תאריך לידה": {
-    "יום": "",
-    "חודש": "",
-    "שנה": ""
+    "יום": "15",
+    "חודש": "03",
+    "שנה": "1985"
   },
   "כתובת": {
-    "רחוב": "",
-    "מספר בית": "",
-    "כניסה": "",
-    "דירה": "",
-    "ישוב": "",
-    "מיקוד": "",
-    "תא דואר": ""
+    "רחוב": "הרצל",
+    "מספר בית": "25",
+    "ישוב": "תל אביב",
+    "מיקוד": "6473301"
   },
-  "טלפון קווי": "",
-  "טלפון נייד": "",
-  "סוג העבודה": "",
-  "תאריך הפגיעה": {
-    "יום": "",
-    "חודש": "",
-    "שנה": ""
-  },
-  "שעת הפגיעה": "",
-  "מקום התאונה": "",
-  "כתובת מקום התאונה": "",
-  "תיאור התאונה": "",
-  "האיבר שנפגע": "",
-  "חתימה": "",
-  "תאריך מילוי הטופס": {
-    "יום": "",
-    "חודש": "",
-    "שנה": ""
-  },
-  "תאריך קבלת הטופס בקופה": {
-    "יום": "",
-    "חודש": "",
-    "שנה": ""
-  },
-  "למילוי ע\"י המוסד הרפואי": {
-    "חבר בקופת חולים": "",
-    "מהות התאונה": "",
-    "אבחנות רפואיות": ""
-  }
+  "טלפון נייד": "0501234567"
 }
 ```
 
-## Part 2: Microservice-based ChatBot Q&A on Medical Services
+### 3. Validation Report (`data/output/validation_reports/{filename}_validation.json`)
 
+Quality metrics and issue tracking:
+```json
+{
+  "accuracy_score": 95.5,
+  "completeness_score": 78.3,
+  "filled_count": 18,
+  "total_count": 23,
+  "corrections": [
+    {
+      "field": "טלפון נייד",
+      "value": "650-123-4567",
+      "reason": "Israeli phone numbers should start with 0"
+    }
+  ],
+  "missing_fields": [
+    "תאריך קבלת הטופס בקופה",
+    "למילוי ע\"י המוסד הרפואי.אבחנות רפואיות"
+  ],
+  "summary": "Validation passed. 18/23 fields filled (78.3%). 21/22 data fields accurate (95.5%). 1 quality issue(s) detected."
+}
+```
 
-### Task
-Develop a microservice-based chatbot system that answers questions about medical services for Israeli health funds (Maccabi, Meuhedet, and Clalit) based on user-specific information. The system should be capable of handling multiple users simultaneously without maintaining server-side user memory.
+## Quality Validation
 
-### Core Requirements
+The validation service performs comprehensive quality checks:
 
-1. **Microservice Architecture**
-   - Implement the chatbot as a stateless microservice using FastAPI or Flask.
-   - Handle multiple concurrent users efficiently.
-   - Manage all user session data and conversation history client-side (frontend).
+### Accuracy Score
+Percentage of filled fields that pass all quality checks (no format violations or Israeli-specific rule violations).
 
-2. **User Interface**
-   - Develop a frontend using **Gradio** or **Streamlit**.
-   - Implement two main phases: User Information Collection and Q&A.
+### Completeness Score
+Percentage of total fields in the form that contain data (not empty).
 
-3. **Azure OpenAI Integration**
-   - Utilize the Azure OpenAI client library for Python.
-   - Implement separate prompts for the information collection and Q&A phases.
+### Quality Checks
 
-4. **Data Handling**
-   - Use provided HTML files provided in the 'phase2_data' folder as the knowledge base for answering questions.
+- **Israeli ID Format**: Must be exactly 9 digits (after removing separators)
+- **Mobile Phone Format**: Must be 10 digits starting with `05`
+- **Landline Phone Format**: Must be 9 digits starting with `0` (but not `05`)
+- **Postal Code Format**: Must be 5-7 digits
+- **Date Field Validation**:
+  - Day: 1-31
+  - Month: 1-12
+  - Year: 1900 to current year + 1
+- **OCR Failure Detection**: Identifies patterns like "ס״ב" marker in last name field
 
-5. **Multi-language Support**
-   - Implement support for Hebrew and English. 
+All validations are **non-blocking** - the system reports issues but does not reject or auto-correct data.
 
-6. **Error Handling and Logging**
-   - Implement comprehensive error handling and validation.
-   - Create a logging system to track chatbot activities, errors, and interactions.
+## Testing
 
-### Detailed Specifications
+Run tests to validate the system:
 
-#### User Information Collection Phase
-Collect the following user information:
-- First and last name
-- ID number (valid 9-digit number)
-- Gender
-- Age (between 0 and 120)
-- HMO name (מכבי | מאוחדת | כללית)
-- HMO card number (9-digit)
-- Insurance membership tier (זהב | כסף | ארד)
-- Provide a confirmation step for users to review and correct their information.
+```bash
+# Validate configuration and imports
+python tests/test_setup.py
 
-**Note:** This process should be managed exclusively through the LLM, avoiding any hardcoded question-answer logic or form-based filling in the UI
+# Test Azure service connectivity
+python tests/test_azure_connection.py
 
+# Test OCR extraction
+python tests/test_phase2.py
 
-#### Q&A Phase
-- Transition to answering questions based on the user's HMO and membership tier.
-- Utilize the knowledge base from provided HTML files.
+# Test GPT-4o field extraction
+python tests/test_phase3.py
 
-#### State Management
-- Pass all necessary user information and conversation history with each request to maintain statelessness.
+# Test Pydantic validation
+python tests/test_phase4.py
 
-### Evaluation Criteria
+# Test quality validation (recommended)
+python tests/test_phase5.py
 
-1. Microservice Architecture Implementation
-2. Technical Proficiency (Azure OpenAI usage, data processing)
-3. Prompt Engineering and LLM Utilization
-4. Code Quality and Organization
-5. User Experience
-6. Performance and Scalability
-7. Documentation
-8. Innovation
-9. Logging and Monitoring Implementation
+# Test error handling
+python tests/test_phase5_with_errors.py
 
-### Submission Guidelines
-1. Provide source code via GitHub.
-2. Include setup and run instructions.
+# End-to-end pipeline test
+python tests/test_phase6.py
+```
 
-**Good luck! For any questions, feel free to contact me.**
+Test data is located in `phase1_data/` directory (excluded from git).
 
-Dor Getter.
+## Logging
+
+The system uses `structlog` for structured logging:
+
+- **Console Output**: Formatted for readability during development
+- **File Output**: JSON format in `logs/app_{YYYY-MM-DD}.log`
+- **Log Levels**: DEBUG, INFO, WARNING, ERROR (configurable via `LOG_LEVEL` env var)
+- **Metadata Included**: Timestamps, service names, file names, token counts, error details
+
+Example log entry:
+```json
+{
+  "event": "Document analysis completed",
+  "level": "info",
+  "timestamp": "2025-01-15T14:30:45.123456Z",
+  "logger": "src.services.document_intelligence",
+  "file_name": "form283_sample.pdf",
+  "pages": 2,
+  "text_length": 1847
+}
+```
+
+## Known Limitations
+
+- **File Format**: Supports PDF files only (no JPG/PNG)
+- **File Size**: Maximum 10MB per document
+- **Azure Dependency**: Requires active Azure subscriptions with sufficient quotas
+- **OCR Quality**: Best results with high-quality scanned documents; poor scans may affect accuracy
+- **GPT-4o Variability**: Field extraction accuracy depends on OCR quality and form legibility
+
+## Dependencies
+
+Core dependencies (see [requirements.txt](requirements.txt) for complete list):
+
+- `azure-ai-documentintelligence>=1.0.0b1` - Azure Document Intelligence SDK
+- `openai>=1.12.0` - Azure OpenAI SDK
+- `pydantic>=2.5.0` - Data validation and serialization
+- `streamlit>=1.30.0` - Web UI framework
+- `structlog>=24.0.0` - Structured logging
+- `python-dotenv>=1.0.0` - Environment variable management
+
+---
+
+**Note**: This is Part 1 of the GenAI Developer Assessment Assignment. For the original assignment details, see [ASSIGNMENT.md](ASSIGNMENT.md).

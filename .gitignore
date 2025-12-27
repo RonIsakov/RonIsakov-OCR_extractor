@@ -63,15 +63,23 @@ test_azure_connection.py
 test_phase2.py
 test_phase3.py
 test_phase4.py
+test_phase5.py
+test_phase5_with_errors.py
+test_phase6.py
 extract_and_save_text.py
+
+# Documentation files
+CLAUDE.md
+IMPLEMENTATION_PLAN.md
+nul
 
 # Data directories - exclude outputs but keep structure
 data/output/
 logs/
 
-# Phase 1 and Phase 2 example data (optional - uncomment to exclude)
- phase1_data/
- phase2_data/
+# Phase 1 and Phase 2 example data
+phase1_data/
+phase2_data/
 
 # Keep directory structure
 !data/input/.gitkeep
