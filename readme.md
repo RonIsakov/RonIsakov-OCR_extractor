@@ -47,7 +47,8 @@ AI-powered system for extracting and validating structured data from Israeli Nat
 ```bash
 # 1. Clone the repository
 git clone <repository-url>
-cd Home-Assignment-GenAI-KPMG
+cd to the cloned directory
+
 
 # 2. Create and activate virtual environment
 python -m venv venv
@@ -99,7 +100,7 @@ python tests/test_azure_connection.py
 
 ### Streamlit Web UI
 
-The easiest way to use the system:
+The way to use the system:
 
 ```bash
 streamlit run src/ui/streamlit_app.py
@@ -308,62 +309,6 @@ Quality metrics and issue tracking:
 }
 ```
 
-## Quality Validation
-
-The validation service performs comprehensive quality checks:
-
-### Accuracy Score
-Percentage of filled fields that pass all quality checks (no format violations or Israeli-specific rule violations).
-
-### Completeness Score
-Percentage of total fields in the form that contain data (not empty).
-
-### Quality Checks
-
-- **Israeli ID Format**: Must be exactly 9 digits (after removing separators)
-- **Mobile Phone Format**: Must be 10 digits starting with `05`
-- **Landline Phone Format**: Must be 9 digits starting with `0` (but not `05`)
-- **Postal Code Format**: Must be 5-7 digits
-- **Date Field Validation**:
-  - Day: 1-31
-  - Month: 1-12
-  - Year: 1900 to current year + 1
-- **OCR Failure Detection**: Identifies patterns like "ס״ב" marker in last name field
-
-All validations are **non-blocking** - the system reports issues but does not reject or auto-correct data.
-
-## Testing
-
-Run tests to validate the system:
-
-```bash
-# Validate configuration and imports
-python tests/test_setup.py
-
-# Test Azure service connectivity
-python tests/test_azure_connection.py
-
-# Test OCR extraction
-python tests/test_phase2.py
-
-# Test GPT-4o field extraction
-python tests/test_phase3.py
-
-# Test Pydantic validation
-python tests/test_phase4.py
-
-# Test quality validation (recommended)
-python tests/test_phase5.py
-
-# Test error handling
-python tests/test_phase5_with_errors.py
-
-# End-to-end pipeline test
-python tests/test_phase6.py
-```
-
-Test data is located in `phase1_data/` directory (excluded from git).
-
 ## Logging
 
 The system uses `structlog` for structured logging:
@@ -406,5 +351,3 @@ Core dependencies (see [requirements.txt](requirements.txt) for complete list):
 - `python-dotenv>=1.0.0` - Environment variable management
 
 ---
-
-**Note**: This is Part 1 of the GenAI Developer Assessment Assignment. For the original assignment details, see [ASSIGNMENT.md](ASSIGNMENT.md).
