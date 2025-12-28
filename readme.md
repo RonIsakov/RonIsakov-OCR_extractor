@@ -55,8 +55,10 @@ python -m venv venv
 
 # On Windows:
 venv\Scripts\activate
+venv\Scripts\activate
 
 # On macOS/Linux:
+source venv/bin/activate
 source venv/bin/activate
 
 # 3. Install dependencies
@@ -86,14 +88,6 @@ MAX_FILE_SIZE_MB=10
 DATA_INPUT_DIR=data/input
 DATA_OUTPUT_DIR=data/output
 LOGS_DIR=logs
-```
-
-### Step 2: Verify Configuration
-
-Test your Azure connections:
-
-```bash
-python tests/test_azure_connection.py
 ```
 
 ## Usage
