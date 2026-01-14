@@ -20,6 +20,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.main import FormProcessor
 from src.models.schemas import Form283Data
 from src.models.validation import ValidationReport
+from src.utils.logger import setup_logging
+from src.config.settings import get_settings
+
+# Initialize logging
+settings = get_settings()
+setup_logging(log_level=settings.LOG_LEVEL, logs_dir=settings.LOGS_DIR)
 
 
 # Page configuration
